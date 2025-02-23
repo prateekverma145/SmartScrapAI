@@ -110,6 +110,6 @@ Feel free to fork the repository and submit pull requests. For major changes, pl
 ## 📞 Contact
 
 For any queries regarding the project, feel free to reach out:
-- Email: vema.job.145pratee@gmail.com
-- LinkedIn: [Your Name]([https://linkedin.com/in/yourprofile](https://www.linkedin.com/in/prateek-verma-2a202b287))
+- Email: verma.job.145pratee@gmail.com
+- LinkedIn: [prateek](https://www.linkedin.com/in/prateek-verma-2a202b287)
 
