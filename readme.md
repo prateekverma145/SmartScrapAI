@@ -4,7 +4,7 @@ QuickNews is an intelligent AI agent that autonomously searches, summarizes, and
 
 ![QuickNews Header Image](assets/ss1.png)
 ## Published news site excellent SEO test proof
-![QuickNews Header Image](assets/seo.png)
+![QuickNews Header Image](assets/seo.jpg)
 ## view our published news - https://testing-news.hashnode.dev/news-roundup-crime-in-india-1
 
 # Proof
