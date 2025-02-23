@@ -1,6 +1,6 @@
 # QuickNews - Autonomous AI News Agent 🤖📰
 
-QuickNews is an intelligent AI agent that autonomously searches, summarizes, and publishes news articles. Built for the Flipr Hackathon 25, it streamlines the process of gathering and publishing news content with zero human intervention.
+QuickNews is an intelligent AI agent that autonomously searches, summarizes, and publishes news articles. Built  industry ready application , it streamlines the process of gathering and publishing news content with zero human intervention.
 
 ![QuickNews Header Image](assets/ss1.png)
 ## view our published news - https://testing-news.hashnode.dev/news-roundup-crime-in-india-1
@@ -107,6 +107,6 @@ Feel free to fork the repository and submit pull requests. For major changes, pl
 ## 📞 Contact
 
 For any queries regarding the project, feel free to reach out:
-- Email: your.email@example.com
-- LinkedIn: [Your Name](https://linkedin.com/in/yourprofile)
-- Twitter: [@yourhandle](https://twitter.com/yourhandle)
+- Email: vema.job.145pratee@gmail.com
+- LinkedIn: [Your Name]([https://linkedin.com/in/yourprofile](https://www.linkedin.com/in/prateek-verma-2a202b287))
+
