@@ -2,7 +2,7 @@
 
 QuickNews is an intelligent AI agent that autonomously searches, summarizes, and publishes news articles. Built for the Flipr Hackathon 25, it streamlines the process of gathering and publishing news content with zero human intervention.
 
-![QuickNews Header Image](assets/ss1.jpg)
+![QuickNews Header Image](assets/ss1.png)
 ## view our publishe news - https://testing-news.hashnode.dev/news-roundup-crime-in-india-1
 
 # Proof
