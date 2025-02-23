@@ -405,7 +405,7 @@ def main():
         st.title("QuickNews – Fast, Reliable, Personalized")
 
     # Display Image
-    st.image("finalimg.jpg", use_container_width =True)  
+    st.image("./assets/finalimg.jpg", use_container_width =True)  
     
 
     st.markdown("---")
