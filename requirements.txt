@@ -54,3 +54,4 @@ tqdm
 transformers
 tzdata
 watchdog
+torch
