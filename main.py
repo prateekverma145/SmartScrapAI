@@ -387,7 +387,7 @@ def main():
     with col2:
         st.title("QuickNews – Fast, Reliable, Personalized")
 
-    st.image("./finalimg.jpg", use_container_width=True)
+    st.image("./assets/finalimg.jpg", use_container_width=True)
     st.markdown("---")
 
     language_map = {
