@@ -1,6 +1,7 @@
-# QuickNews - Autonomous AI News Agent 🤖📰
+# SmartScrapAI - Autonomous AI News Agent 🤖📰
 
-QuickNews is an intelligent AI agent that autonomously searches, summarizes, and publishes news articles. Built  industry ready application , it streamlines the process of gathering and publishing news content with zero human intervention.
+This project is an end-to-end news aggregation and summarization tool built with Streamlit that crawls webpages to collect and process news articles. Users input a news topic, location, and preferred language through an intuitive interface, triggering a workflow where the application searches for relevant news via DuckDuckGo and then crawls the identified webpages using the Newspaper library to extract full article content. The retrieved text is then tokenized and summarized with the "facebook/bart-large-cnn" transformer model, with optional translation applied via GoogleTranslator. Finally, the processed articles—complete with original and AI-generated images—are compiled into a cohesive news roundup that can be directly published to Hashnode.
+
 
 ![QuickNews Header Image](assets/ss1.png)
 ![QuickNews Header Image](assets/ss2.png)
