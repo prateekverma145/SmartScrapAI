@@ -16,9 +16,12 @@ from deep_translator import GoogleTranslator
 from deep_translator.exceptions import RequestError
 import re
 import unicodedata
-import base64
+from transformers import pipeline
 
-# ------------------- Helper Function -------------------
+# Instantiate the transformer summarization pipeline globally
+transformer_summarizer = pipeline("summarization", model="facebook/bart-large-cnn")
+
+# ------------------- Helper Functions -------------------
 def safe_translate(text, target_language, chunk_size=4900, max_retries=3):
     """
     Translate text in chunks to avoid deep_translator length limits.
@@ -34,17 +37,40 @@ def safe_translate(text, target_language, chunk_size=4900, max_retries=3):
                 break  # Break out of retry loop on success
             except RequestError as e:
                 if attempt == max_retries - 1:
-                    # st.error(f"Translation failed for a chunk after {max_retries} attempts: {e}")
                     translated_text += chunk  # Fallback: append original text
                 else:
                     time.sleep(1)  # Wait before retrying
     return translated_text
 
-try:
-    nltk.download('punkt_tab', quiet=True)
-except:
-    st.warning("Could not download punkt_tab. Attempting to download all NLTK data.")
-    nltk.download('all', quiet=True)
+def transformer_summarize(text: str, summarizer, max_chunk_size: int = 1000, max_length: int = 130, min_length: int = 30) -> str:
+    """
+    Summarize a long text using a transformer summarization pipeline.
+    The text is split into chunks (based on sentence boundaries) to avoid token length issues.
+    """
+    if not text:
+        return ""
+    nltk.download('punkt', quiet=True)
+    sentences = sent_tokenize(text)
+    chunks = []
+    current_chunk = ""
+    for sentence in sentences:
+        if len(current_chunk) + len(sentence) <= max_chunk_size:
+            current_chunk += " " + sentence
+        else:
+            chunks.append(current_chunk.strip())
+            current_chunk = sentence
+    if current_chunk:
+        chunks.append(current_chunk.strip())
+    
+    summary_text = ""
+    for chunk in chunks:
+        try:
+            summarized = summarizer(chunk, max_length=max_length, min_length=min_length, do_sample=False)
+            summary_text += summarized[0]['summary_text'] + " "
+        except Exception as e:
+            st.error(f"Error during transformer summarization: {str(e)}")
+            summary_text += chunk + " "
+    return summary_text.strip()
 
 # ------------------- NewsSearcher -------------------
 class NewsSearcher:
@@ -65,10 +91,8 @@ class NewsSearcher:
     def search_news(self, query: str, location: str = None) -> List[Dict]:
         articles = []
         try:
-             # Append "-site:msn.com -site:usnews.com" to exclude MSN and usnews.com from search results
             keywords = f"{query} {location} news -site:msn.com -site:usnews.com" if location else f"{query} news -site:msn.com -site:usnews.com"
             keywords = keywords.strip().replace("  ", " ")
-
             with DDGS() as ddgs:
                 results = list(ddgs.news(
                     keywords=keywords,
@@ -77,7 +101,6 @@ class NewsSearcher:
                     timelimit=self.search_settings['timelimit'],
                     max_results=self.search_settings['max_results']
                 ))
-
                 for result in results:
                     article = {
                         'url': result['url'],
@@ -88,12 +111,9 @@ class NewsSearcher:
                         'image_url': result.get('image', None)
                     }
                     articles.append(article)
-
         except Exception as e:
             st.error(f"Error in DuckDuckGo news search: {str(e)}")
-
         return articles
-    
 
 # ------------------- NewsProcessor -------------------
 class NewsProcessor:
@@ -104,9 +124,8 @@ class NewsProcessor:
         except Exception:
             self.stopwords = set(list(punctuation))
 
-    def fetch_article(self, url: str) -> Dict:
+    def fetch_article(self, url: str) -> dict:
         try:
-            # Create a config with a custom browser user agent
             config = Config()
             config.browser_user_agent = (
                 "Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
@@ -126,7 +145,6 @@ class NewsProcessor:
                 'image_url': article.top_image
             }
         except Exception:
-            # Silently log error but return a valid dict with available information
             return {
                 'title': "Article Preview Unavailable",
                 'text': "Full article content could not be retrieved. You can visit the original source for complete information.",
@@ -135,25 +153,14 @@ class NewsProcessor:
                 'image_url': None
             }
 
-    def summarize_text(self, text: str, num_sentences: int = 5) -> str:
+    def summarize_text(self, text: str, max_length: int = 130, min_length: int = 30) -> str:
+        """
+        Summarizes the provided text using the transformer summarizer.
+        """
         if not text:
             return ""
         try:
-            sentences = text.split('. ')
-            if len(sentences) <= num_sentences:
-                return text
-            words = text.lower().split()
-            word_freq = {}
-            for word in words:
-                if word not in self.stopwords:
-                    word_freq[word] = word_freq.get(word, 0) + 1
-            sentence_scores = {}
-            for sentence in sentences:
-                for word in sentence.lower().split():
-                    if word in word_freq:
-                        sentence_scores[sentence] = sentence_scores.get(sentence, 0) + word_freq[word]
-            summary_sentences = nlargest(num_sentences, sentence_scores, key=sentence_scores.get)
-            return '. '.join(summary_sentences) + '.'
+            return transformer_summarize(text, transformer_summarizer, max_chunk_size=1000, max_length=max_length, min_length=min_length)
         except Exception as e:
             st.error(f"Error in summarization: {str(e)}")
             return text[:500] + "..."
@@ -194,27 +201,17 @@ class HashnodePublisher:
         slug = slug.strip('-')
         return slug[:250]
 
-    def _summarize_text(self, text: str, num_sentences: int = 5) -> str:
-        from nltk.tokenize import sent_tokenize, word_tokenize
-        from nltk.corpus import stopwords
+    def _summarize_text(self, text: str, max_length: int = 130, min_length: int = 30) -> str:
+        """
+        Uses the transformer summarizer to summarize combined article text.
+        """
         if not text:
             return ""
-        stop_words = set(stopwords.words('english') + list(punctuation))
-        sentences = sent_tokenize(text)
-        if len(sentences) <= num_sentences:
-            return text
-        freq = {}
-        for word in word_tokenize(text.lower()):
-            if word not in stop_words:
-                freq[word] = freq.get(word, 0) + 1
-        sentence_scores = {}
-        for sentence in sentences:
-            for word in word_tokenize(sentence.lower()):
-                if word in freq:
-                    sentence_scores[sentence] = sentence_scores.get(sentence, 0) + freq[word]
-        top_sentences = nlargest(num_sentences, sentence_scores, key=sentence_scores.get)
-        summary = " ".join(top_sentences)
-        return summary
+        try:
+            return transformer_summarize(text, transformer_summarizer, max_chunk_size=1000, max_length=max_length, min_length=min_length)
+        except Exception as e:
+            st.error(f"Error in summarization: {str(e)}")
+            return text[:500] + "..."
 
     def generate_image(self, article: dict) -> str:
         try:
@@ -228,10 +225,8 @@ class HashnodePublisher:
             if response.status_code == 200:
                 return image_url
             else:
-                # st.warning(f"Could not generate AI image for: {article.get('title', 'Untitled')}")
                 return None
         except Exception as e:
-            # st.warning(f"Error generating AI image: {str(e)}")
             return None
 
     def publish_combined_article(self, articles, topic: str, location: str = None, language: str = "en") -> dict:
@@ -240,23 +235,18 @@ class HashnodePublisher:
             if ai_image:
                 article['ai_image_url'] = ai_image
 
-        # Create the original title in English for slug generation.
         original_title = f"News Roundup: {topic.title()}"
         if location:
             original_title += f" in {location.title()}"
-        
-        # Generate slug from the original title.
         slug = self._slugify(original_title)
         if not slug:
             slug = f"news-roundup-{datetime.now().strftime('%Y%m%d%H%M%S')}"
         
-        # Translate title only for display if needed.
         if language != "en":
             display_title = safe_translate(original_title, language)
         else:
             display_title = original_title
 
-        # Format combined content (the translation of the content is handled inside the method)
         content = self.format_combined_content(articles, topic, location, language)
         
         cover_image = None
@@ -296,7 +286,6 @@ class HashnodePublisher:
             st.error(f"Error publishing article: {str(e)}")
             return None
 
-
     def format_combined_content(self, articles, topic: str, location: str = None, language: str = "en") -> str:
         current_date = datetime.now().strftime("%Y-%m-%d")
         combined_text = ""
@@ -305,7 +294,7 @@ class HashnodePublisher:
                 combined_text += article['text'] + " "
             elif article.get('summary'):
                 combined_text += article['summary'] + " "
-        combined_summary = self._summarize_text(combined_text, num_sentences=5)
+        combined_summary = self._summarize_text(combined_text, max_length=130, min_length=30)
         content = f"# News Roundup: {topic.title()}"
         if location:
             content += f" in {location.title()}"
@@ -346,7 +335,6 @@ class HashnodePublisher:
 
 # ------------------- Streamlit App -------------------
 def main():
-    # Set page config
     st.set_page_config(
         page_title="QuickNews – Fast, Reliable, Personalized",
         page_icon="📡",
@@ -381,11 +369,9 @@ def main():
             border-radius: 4px !important;
             font-size: 12px !important;
         }
-
         </style>
     """, unsafe_allow_html=True)
 
-    # Initialize session state
     if "processed_articles" not in st.session_state:
         st.session_state.processed_articles = []
     if "search_query" not in st.session_state:
@@ -395,22 +381,15 @@ def main():
     if "language" not in st.session_state:
         st.session_state.language = "en"
 
-    # Header section with logo and title
     col1, col2 = st.columns([1, 3])
-    
     with col1:
         st.markdown("# 🕵️")
-    
     with col2:
         st.title("QuickNews – Fast, Reliable, Personalized")
 
-    # Display Image
-    st.image("./assets/finalimg.jpg", use_container_width =True)  
-    
-
+    st.image("./finalimg.jpg", use_container_width=True)
     st.markdown("---")
 
-    # Language mapping
     language_map = {
         "en": "English", "es": "Spanish", "fr": "French",
         "de": "German", "it": "Italian", "pt": "Portuguese",
@@ -419,17 +398,14 @@ def main():
     }
     language_names = list(language_map.values())
 
-    # Search section
     st.markdown("### 🔍 Search Parameters")
     col1, col2 = st.columns(2)
-    
     with col1:
         search_query = st.text_input(
             "News Topic",
             value=st.session_state.search_query,
             placeholder="Enter a topic to search..."
         )
-        
     with col2:
         location = st.text_input(
             "Location (Optional)",
@@ -438,7 +414,6 @@ def main():
         )
 
     col3, col4 = st.columns(2)
-    
     with col3:
         default_language_name = language_map.get(st.session_state.language, "English")
         selected_language_name = st.selectbox(
@@ -448,12 +423,9 @@ def main():
         )
         selected_language_code = [code for code, name in language_map.items() if name == selected_language_name][0]
         st.session_state.language = selected_language_code
-
     with col4:
         st.markdown("<br>", unsafe_allow_html=True)
         search_button = st.button("🔎 Search News")
-
-
 
     if search_button:
         st.session_state.search_query = search_query
@@ -464,40 +436,31 @@ def main():
                     searcher = NewsSearcher()
                     processor = NewsProcessor()
                     articles_info = searcher.search_news(search_query, location)
-                    
                     if articles_info:
                         results_container = st.container()
                         with results_container:
                             st.markdown("### 📚 Search Results")
-                            
                             seen_titles = set()
                             unique_articles = []
                             processed_articles = []
-                            
                             progress_bar = st.progress(0)
                             total_articles = len(articles_info)
-                            
                             for idx, art in enumerate(articles_info):
                                 if art['title'] not in seen_titles:
                                     seen_titles.add(art['title'])
                                     unique_articles.append(art)
-                                    
                                     progress = (idx + 1) / total_articles
                                     progress_bar.progress(progress)
-                                    
-                                    # Enhanced article display with larger headline and description
                                     st.markdown(f"""
                                         <div class="article-headline">
                                             {art['title']}
                                         </div>
                                     """, unsafe_allow_html=True)
-                                    
                                     col1, col2 = st.columns([1, 2])
                                     with col1:
                                         if art.get('image_url'):
                                             st.image(art['image_url'], use_container_width=True)
                                     with col2:
-                                        # Add article description
                                         if art.get('body'):
                                             description = art['body'][:300] + "..." if len(art['body']) > 300 else art['body']
                                             st.markdown(f"""
@@ -505,18 +468,13 @@ def main():
                                                     {description}
                                                 </div>
                                             """, unsafe_allow_html=True)
-                                        
-                                        # Metadata section
                                         st.markdown(f"""
                                             <div class="metadata">
                                                 <strong>Source:</strong> {art['source']}<br>
                                                 <strong>Published:</strong> {art.get('publish_date', 'Date not available')}<br>
                                             </div>
                                         """, unsafe_allow_html=True)
-                                        
                                         st.markdown(f"**URL:** [{art['url']}]({art['url']})")
-                                        
-                                    # Process full article
                                     article_data = processor.fetch_article(art['url'])
                                     if article_data:
                                         if article_data.get('text'):
@@ -524,12 +482,8 @@ def main():
                                         article_data['source'] = art['source']
                                         article_data['publish_date'] = (art['publish_date'] or article_data['publish_date'])
                                         processed_articles.append(article_data)
-                                        
                                     st.markdown("---")
-                            
                             progress_bar.empty()
-                            
-                            # Translation handling
                             if st.session_state.language != "en":
                                 with st.spinner("🌐 Translating content..."):
                                     for idx, article in enumerate(processed_articles):
@@ -537,9 +491,7 @@ def main():
                                             if article.get(key):
                                                 article[key] = safe_translate(article[key], st.session_state.language)
                                         processed_articles[idx] = article
-                            
                             st.session_state.processed_articles = processed_articles
-                            
                             if processed_articles:
                                 st.success(f"✅ Successfully processed {len(processed_articles)} articles")
                     else:
@@ -549,15 +501,12 @@ def main():
         else:
             st.warning("Please enter a search topic.", icon="⚠️")
 
-    # Publication section
     if st.session_state.processed_articles:
         st.markdown("---")
         st.markdown("### 📤 Publication")
         publish_col1, publish_col2 = st.columns([3, 1])
-        
         with publish_col1:
             st.info(f"📝 Found {len(st.session_state.processed_articles)} articles ready for publication", icon="ℹ️")
-            
         with publish_col2:
             if st.button("🚀 Publish to Hashnode"):
                 with st.spinner("📡 Publishing to Hashnode..."):
