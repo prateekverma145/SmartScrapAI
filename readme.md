@@ -5,7 +5,7 @@ This project is an end-to-end news aggregation and summarization tool built with
 
 ![QuickNews Header Image](assets/ss1.png)
 ![QuickNews Header Image](assets/ss2.png)
-## Published news site excellent SEO test proof
+## Published news site excellent SEO test proofs
 ![QuickNews Header Image](assets/seo.jpg)
 ## view our published news - [link](https://testing-news.hashnode.dev/news-roundup-crime-in-lucknow)
 
